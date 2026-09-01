@@ -23,6 +23,9 @@ const envSchema = z.object({
   API_URL: z.string().url('API_URL must be a valid URL').default('http://localhost:3000'),
   WEB_APP_URL: z.string().url('WEB_APP_URL must be a valid URL').optional(),
   
+  // CORS configuration
+  CORS_ORIGIN: z.string().optional().default('http://localhost:3000'),
+  
   RATE_LIMIT_WINDOW_MS: z.string().transform(Number).pipe(z.number().min(1)).default('60000'),
   RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).pipe(z.number().min(1)).default('100'),
   

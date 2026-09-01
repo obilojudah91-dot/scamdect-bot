@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
-    "test": "vitest"
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
+    "@fastify/helmet": "^11.1.0",
     "@fastify/rate-limit": "^9.1.0",
     "@prisma/client": "^5.7.0",
     "@telegram-bot/config": "*",

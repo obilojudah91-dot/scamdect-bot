@@ -4,12 +4,14 @@ import { env } from '@telegram-bot/config';
 import { prisma } from '@telegram-bot/database';
 import { logger, BotContext } from '@telegram-bot/shared';
 import { ACTIVITY_TYPES } from '@telegram-bot/shared';
+import { botRateLimitMiddleware } from './rateLimit';
 
 interface CustomContext extends Context {
   botContext?: BotContext;
 }
 
 export function setupMiddleware(bot: any) {
+  bot.use(botRateLimitMiddleware());
   bot.use(userRegistrationMiddleware());
   bot.use(activityLoggingMiddleware());
   bot.use(errorHandlingMiddleware());

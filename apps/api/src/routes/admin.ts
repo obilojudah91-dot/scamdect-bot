@@ -7,6 +7,41 @@ interface FastifyRequestWithUser {
   user?: { telegramId: bigint };
 }
 
+// Audit logging function for admin actions
+async function logAdminAction(
+  adminTelegramId: bigint,
+  action: string,
+  metadata?: Record<string, unknown>
+) {
+  try {
+    // Find admin user ID from telegram ID
+    const adminUser = await prisma.user.findUnique({
+      where: { telegramId: adminTelegramId },
+      select: { id: true },
+    });
+
+    if (adminUser) {
+      await prisma.adminAction.create({
+        data: {
+          adminId: adminUser.id,
+          action,
+          targetId: 'system',
+          metadata: metadata || {},
+        },
+      });
+
+      logger.info({
+        adminTelegramId: adminTelegramId.toString(),
+        action,
+        metadata,
+      }, 'Admin action logged');
+    }
+  } catch (error) {
+    logger.error({ error, adminTelegramId: adminTelegramId.toString(), action }, 'Failed to log admin action');
+    // Don't throw - audit logging failure shouldn't block the action
+  }
+}
+
 export async function adminRoutes(fastify: FastifyInstance) {
   fastify.get('/api/admin/stats', {
     preHandler: async (request, reply) => {
@@ -50,6 +85,9 @@ export async function adminRoutes(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     try {
+      const { user } = request as FastifyRequestWithUser;
+      const adminTelegramId = user!.telegramId;
+
       const totalUsers = await prisma.user.count();
       const activeUsers = await prisma.user.count({
         where: { isActive: true },
@@ -61,6 +99,12 @@ export async function adminRoutes(fastify: FastifyInstance) {
             gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
           },
         },
+      });
+
+      // Log admin action
+      await logAdminAction(adminTelegramId, 'view_stats', {
+        totalUsers,
+        activeUsers,
       });
 
       return {
@@ -127,6 +171,9 @@ export async function adminRoutes(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     try {
+      const { user } = request as FastifyRequestWithUser;
+      const adminTelegramId = user!.telegramId;
+
       const page = parseInt((request.query as any).page || '1', 10);
       const limit = Math.min(parseInt((request.query as any).limit || '50', 10), 100); // Cap at 100
       const skip = (page - 1) * limit;
@@ -139,6 +186,13 @@ export async function adminRoutes(fastify: FastifyInstance) {
         }),
         prisma.user.count(),
       ]);
+
+      // Log admin action (without exposing user data)
+      await logAdminAction(adminTelegramId, 'view_users', {
+        page,
+        limit,
+        totalResults: total,
+      });
 
       return {
         success: true,
