@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: scamdect-bot
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_IDS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_USE_WEBHOOK
+        value: "true"
+      - key: TELEGRAM_WEBHOOK_URL
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: LOG_LEVEL
+        value: info
+
