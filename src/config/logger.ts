@@ -14,11 +14,13 @@ const REDACT_PATHS = [
   "*.SCAMDECT_API_KEY",
 ];
 
-export const logger = pino({
+const options: pino.LoggerOptions = {
   level: env.LOG_LEVEL,
   redact: { paths: REDACT_PATHS, censor: "[REDACTED]" },
-  transport:
-    env.NODE_ENV === "development"
-      ? { target: "pino-pretty", options: { colorize: true, translateTime: "SYS:standard" } }
-      : undefined,
-});
+};
+
+if (env.NODE_ENV === "development") {
+  options.transport = { target: "pino-pretty", options: { colorize: true, translateTime: "SYS:standard" } };
+}
+
+export const logger = pino(options);

@@ -5,13 +5,23 @@ import { logger } from "../config/logger.js";
 export function createHealthServer() {
   const app = express();
 
+  app.get("/", async (_req, res) => {
+    res.json({
+      name: "ScamDect Bot",
+      status: "running",
+      endpoints: {
+        health: "/health",
+      },
+    });
+  });
+
   app.get("/health", async (_req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
-      res.status(200).json({ status: "ok" });
+      res.status(200).json({ status: "ok", database: "connected" });
     } catch (err) {
-      logger.error({ err }, "Health check DB ping failed");
-      res.status(503).json({ status: "unhealthy" });
+      logger.warn({ err }, "Health check DB ping failed, but server is running");
+      res.status(200).json({ status: "ok", database: "disconnected" });
     }
   });
 

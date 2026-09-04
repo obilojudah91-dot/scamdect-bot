@@ -13,8 +13,8 @@ export interface ReportSubmission {
   normalizedValue: string;
   category: ScamCategory;
   description: string;
-  platform?: string;
-  amountInvolved?: number;
+  platform?: string | undefined;
+  amountInvolved?: number | undefined;
   reporterTelegramId: string;
 }
 

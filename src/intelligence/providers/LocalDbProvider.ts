@@ -1,6 +1,7 @@
 import { prisma } from "../../db/client.js";
 import { logger } from "../../config/logger.js";
 import type { IdentifierType, RiskLevel, ScamCategory } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import type {
   ScamIntelligenceProvider,
@@ -112,7 +113,7 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
         identifierId: identifier.id,
         category: submission.category,
         description: submission.description,
-        platform: submission.platform,
+        platform: submission.platform ?? null,
         amountInvolved: submission.amountInvolved
           ? new Prisma.Decimal(submission.amountInvolved)
           : null,
@@ -168,7 +169,8 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
         FAKE_GIVEAWAY: 8,
         OTHER: 3,
       };
-      score += categoryWeights[report.category] || 5;
+      const categoryWeight = categoryWeights[report.category as ScamCategory];
+      score += categoryWeight || 5;
 
       // Amount involved increases risk
       if (report.amountInvolved) {

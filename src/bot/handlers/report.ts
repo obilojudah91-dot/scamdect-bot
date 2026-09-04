@@ -190,7 +190,9 @@ export async function handleReportTextStep(
     case "AWAITING_AMOUNT": {
       const parsed = Number(text.replace(/[^0-9.]/g, ""));
       const amount = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-      const updated = updateReportDraft(userId, { amountInvolved: amount, step: "AWAITING_CONFIRMATION" });
+      const draftUpdate: Partial<ReportDraft> = { step: "AWAITING_CONFIRMATION" };
+      if (amount !== undefined) draftUpdate.amountInvolved = amount;
+      const updated = updateReportDraft(userId, draftUpdate);
       if (updated) await ctx.reply(renderReview(updated), { parse_mode: "Markdown", ...confirmReportKeyboard });
       return true;
     }

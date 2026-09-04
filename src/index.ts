@@ -19,7 +19,7 @@ async function main() {
 
   if (env.TELEGRAM_USE_WEBHOOK) {
     await bot.telegram.setWebhook(env.TELEGRAM_WEBHOOK_URL!, {
-      secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+      secret_token: env.TELEGRAM_WEBHOOK_SECRET!,
     });
     healthApp.use(await bot.createWebhook({ domain: env.TELEGRAM_WEBHOOK_URL! }));
     logger.info("Bot running in webhook mode");
