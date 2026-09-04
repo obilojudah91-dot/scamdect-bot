@@ -40,29 +40,8 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
 });
 
-type EnvSchema = z.infer<typeof envSchema>;
+type EnvSchema = z.infer<typeof envSchema;
 
-function validateEnv(): EnvSchema {
-  try {
-    return envSchema.parse(process.env);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      // In development, log warnings but don't fail for missing fields
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Environment validation warnings:', error.errors.map((e) => `- ${e.path.join('.')}: ${e.message}`).join('\n'));
-        // Return parsed result with defaults for missing fields
-        return envSchema.safeParse(process.env).data || envSchema.parse({});
-      }
-      
-      // In production, fail on any validation error
-      throw new Error(
-        `Environment validation failed:\n${error.errors.map((e) => `- ${e.path.join('.')}: ${e.message}`).join('\n')}`
-      );
-    }
-    throw error;
-  }
-}
-
-export const env = validateEnv();
+export const env = envSchema.parse(process.env);
 
 export type { EnvSchema };

@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IdentifierType {
+  PHONE
+  URL
+  EMAIL
+  USERNAME
+  CRYPTO_WALLET
+  PAYMENT_ID
+  TEXT
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  SUSPICIOUS
+  HIGH
+  CRITICAL
+  UNKNOWN
+}
+
+enum ScamCategory {
+  INVESTMENT
+  ROMANCE
+  JOB_SCAM
+  ONLINE_SHOPPING
+  PHISHING
+  IMPERSONATION
+  CRYPTO
+  FAKE_GIVEAWAY
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Identifier {
+  id             String          @id @default(cuid())
+  type           IdentifierType
+  normalizedValue String         @unique
+  rawValueSample String?         // last raw sample seen, for investigator context only
+  riskScore      Int             @default(0)
+  riskLevel      RiskLevel       @default(UNKNOWN)
+  checkCount     Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  reports        ScamReport[]
+
+  @@index([type])
+  @@index([riskLevel])
+}
+
+model ScamReport {
+  id             String        @id @default(cuid())
+  identifierId   String
+  identifier     Identifier    @relation(fields: [identifierId], references: [id])
+  category       ScamCategory
+  description    String
+  platform       String?
+  amountInvolved Decimal?      @db.Decimal(14, 2)
+  status         ReportStatus  @default(PENDING)
+
+  // Reporter linkage kept internal-only; never exposed in bot output
+  reporterTelegramId String
+  contentHash    String        // hash of normalized identifier+category+description, for dedup
+
+  createdAt      DateTime      @default(now())
+  reviewedAt     DateTime?
+  reviewedBy     String?       // admin Telegram ID
+
+  @@index([identifierId])
+  @@index([status])
+  @@index([contentHash])
+  @@index([reporterTelegramId, createdAt])
+}
+
+model CheckAudit {
+  id             String   @id @default(cuid())
+  identifierId   String?
+  requestedType  IdentifierType?
+  telegramUserId String
+  createdAt      DateTime @default(now())
+
+  @@index([telegramUserId, createdAt])
+}
+
+model AdminAction {
+  id          String   @id @default(cuid())
+  adminId     String
+  action      String
+  targetType  String
+  targetId    String
+  createdAt   DateTime @default(now())
+
+  @@index([adminId, createdAt])
+}

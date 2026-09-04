@@ -1,33 +1,39 @@
 {
-  "name": "telegram-bot-monorepo",
-  "version": "1.0.0",
+  "name": "scamdect-bot",
+  "version": "0.1.0",
   "private": true,
-  "description": "Production-grade Telegram Bot with API and Mini App support",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "type": "module",
+  "engines": { "node": ">=20" },
   "scripts": {
-    "dev": "dotenv -e .env -- turbo run dev",
-    "build": "turbo run build",
-    "test": "turbo run test",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "db:generate": "cd packages/database && npx prisma generate",
-    "db:push": "cd packages/database && npx prisma db push",
-    "db:migrate": "cd packages/database && npx prisma migrate dev",
-    "db:studio": "cd packages/database && npx prisma studio"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "@prisma/client": "^5.20.0",
+    "zod": "^3.23.8",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.2.2",
+    "express": "^4.21.0",
+    "ioredis": "^5.4.1",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "dotenv-cli": "^7.4.0",
-    "prettier": "^3.1.0",
-    "turbo": "^2.10.12",
-    "typescript": "^5.3.0"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  },
-  "packageManager": "npm@9.0.0"
+    "typescript": "^5.6.2",
+    "tsx": "^4.19.1",
+    "prisma": "^5.20.0",
+    "vitest": "^2.1.1",
+    "@types/node": "^22.5.5",
+    "@types/express": "^4.17.21",
+    "eslint": "^9.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.5.0",
+    "@typescript-eslint/parser": "^8.5.0"
+  }
 }
