@@ -17,16 +17,8 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
     normalizedValue: string,
     telegramUserId: string
   ): Promise<CheckResult> {
-    // Log the check for analytics
-    await prisma.checkAudit.create({
-      data: {
-        identifierId: normalizedValue,
-        requestedType: type,
-        telegramUserId,
-      },
-    });
-
-    // Find or create the identifier
+    // Find or create the identifier first. CheckAudit.identifierId stores the
+    // database id, not the normalized value.
     const identifier = await prisma.identifier.upsert({
       where: { normalizedValue },
       update: { checkCount: { increment: 1 } },
@@ -40,7 +32,14 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       },
     });
 
-    // Fetch reports for this identifier
+    await prisma.checkAudit.create({
+      data: {
+        identifierId: identifier.id,
+        requestedType: type,
+        telegramUserId,
+      },
+    });
+
     const reports = await prisma.scamReport.findMany({
       where: {
         identifierId: identifier.id,
@@ -48,12 +47,10 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       },
     });
 
-    // Calculate risk based on reports
     const riskScore = this.calculateRiskScore(reports);
     const riskLevel = this.mapScoreToLevel(riskScore);
     const reasons = this.generateReasons(reports, riskLevel);
 
-    // Update identifier with new risk assessment
     await prisma.identifier.update({
       where: { id: identifier.id },
       data: { riskScore, riskLevel },
@@ -69,10 +66,9 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
   }
 
   async submitReport(submission: ReportSubmission): Promise<ReportResult> {
-    // Find or create the identifier
     const identifier = await prisma.identifier.upsert({
       where: { normalizedValue: submission.normalizedValue },
-      update: {},
+      update: { type: submission.type },
       create: {
         type: submission.type,
         normalizedValue: submission.normalizedValue,
@@ -83,7 +79,6 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       },
     });
 
-    // Generate content hash for deduplication
     const contentHash = crypto
       .createHash("sha256")
       .update(
@@ -91,7 +86,6 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       )
       .digest("hex");
 
-    // Check for duplicate report (same identifier, category, description within last 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const existing = await prisma.scamReport.findFirst({
       where: {
@@ -107,16 +101,16 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       return { isDuplicate: true };
     }
 
-    // Create the report
     await prisma.scamReport.create({
       data: {
         identifierId: identifier.id,
         category: submission.category,
         description: submission.description,
         platform: submission.platform ?? null,
-        amountInvolved: submission.amountInvolved
-          ? new Prisma.Decimal(submission.amountInvolved)
-          : null,
+        amountInvolved:
+          submission.amountInvolved !== undefined
+            ? new Prisma.Decimal(submission.amountInvolved)
+            : null,
         reporterTelegramId: submission.reporterTelegramId,
         contentHash,
         status: "PENDING",
@@ -132,7 +126,7 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       await Promise.all([
         prisma.scamReport.count(),
         prisma.checkAudit.count(),
-        prisma.identifier.count({ where: { riskLevel: "HIGH" } }),
+        prisma.identifier.count({ where: { riskLevel: { in: ["HIGH", "CRITICAL"] } } }),
         prisma.scamReport.count({ where: { status: "VERIFIED" } }),
       ]);
 
@@ -144,35 +138,28 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
     };
   }
 
-  private calculateRiskScore(reports: any[]): number {
+  private calculateRiskScore(reports: Prisma.ScamReportGetPayload<object>[]): number {
     if (reports.length === 0) return 0;
 
     let score = 0;
+    const categoryWeights: Record<ScamCategory, number> = {
+      INVESTMENT: 15,
+      CRYPTO: 15,
+      PHISHING: 12,
+      IMPERSONATION: 10,
+      ROMANCE: 10,
+      JOB_SCAM: 8,
+      ONLINE_SHOPPING: 5,
+      FAKE_GIVEAWAY: 8,
+      OTHER: 3,
+    };
+
     for (const report of reports) {
-      // Base score for each report
       score += 10;
 
-      // Bonus for verified reports
-      if (report.status === "VERIFIED") {
-        score += 20;
-      }
+      if (report.status === "VERIFIED") score += 20;
+      score += categoryWeights[report.category] ?? 5;
 
-      // Category-specific weights
-      const categoryWeights: Record<ScamCategory, number> = {
-        INVESTMENT: 15,
-        CRYPTO: 15,
-        PHISHING: 12,
-        IMPERSONATION: 10,
-        ROMANCE: 10,
-        JOB_SCAM: 8,
-        ONLINE_SHOPPING: 5,
-        FAKE_GIVEAWAY: 8,
-        OTHER: 3,
-      };
-      const categoryWeight = categoryWeights[report.category as ScamCategory];
-      score += categoryWeight || 5;
-
-      // Amount involved increases risk
       if (report.amountInvolved) {
         const amount = Number(report.amountInvolved);
         if (amount > 1000) score += 15;
@@ -181,7 +168,6 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
       }
     }
 
-    // Cap at 100
     return Math.min(score, 100);
   }
 
@@ -194,25 +180,20 @@ export class LocalDbProvider implements ScamIntelligenceProvider {
     return "UNKNOWN";
   }
 
-  private generateReasons(reports: any[], riskLevel: RiskLevel): string[] {
+  private generateReasons(
+    reports: Prisma.ScamReportGetPayload<object>[],
+    riskLevel: RiskLevel
+  ): string[] {
     if (reports.length === 0) return [];
 
-    const reasons: string[] = [];
-
-    if (reports.length > 0) {
-      reasons.push(`${reports.length} report(s) found for this identifier`);
-    }
-
+    const reasons: string[] = [`${reports.length} report(s) found for this identifier`];
     const verifiedCount = reports.filter((r) => r.status === "VERIFIED").length;
-    if (verifiedCount > 0) {
-      reasons.push(`${verifiedCount} verified report(s)`);
-    }
+
+    if (verifiedCount > 0) reasons.push(`${verifiedCount} verified report(s)`);
 
     const categories = new Set(reports.map((r) => r.category));
     if (categories.size > 0) {
-      reasons.push(
-        `Reported for: ${Array.from(categories).join(", ")}`
-      );
+      reasons.push(`Reported for: ${Array.from(categories).join(", ")}`);
     }
 
     if (riskLevel === "CRITICAL" || riskLevel === "HIGH") {
